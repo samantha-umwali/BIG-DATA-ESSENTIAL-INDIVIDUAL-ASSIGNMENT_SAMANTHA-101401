@@ -1,0 +1,166 @@
+================================================================================
+          HADOOP BIG DATA TAXI TRIP ANALYTICS - COMMAND REFERENCE
+================================================================================
+
+1. START HADOOP DAEMONS & VERIFY CLUSTER STATUS
+--------------------------------------------------------------------------------
+# Start NameNode, DataNode, ResourceManager, NodeManager
+start-all.cmd
+
+# Verify active Java processes
+jps
+
+# Check HDFS cluster health and report
+hdfs dfsadmin -report
+
+
+2. INSTALL PYTHON DEPENDENCIES
+--------------------------------------------------------------------------------
+pip install matplotlib pandas openpyxl pillow
+
+
+3. HDFS DIRECTORY SETUP & DATA INGESTION
+--------------------------------------------------------------------------------
+# Create directory structure in HDFS
+hdfs dfs -mkdir -p /taxi_project/input/raw
+hdfs dfs -mkdir -p /taxi_project/input/cleaned
+hdfs dfs -mkdir -p /taxi_project/output
+
+# Upload cleaned CSV dataset to HDFS
+hdfs dfs -put -f cleaned_yellow_tripdata.csv /taxi_project/input/cleaned/
+
+# Verify file upload
+hdfs dfs -ls -h /taxi_project/input/cleaned/
+
+
+4. EXECUTE MAPREDUCE STREAMING JOBS (HADOOP STREAMING)
+--------------------------------------------------------------------------------
+# A. Hourly Demand Analysis
+hdfs dfs -rm -r -f /taxi_project/output/hourly
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_hourly.py,reducers\reducer_hourly.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/hourly ^
+  -mapper "python mapper_hourly.py" ^
+  -reducer "python reducer_hourly.py"
+
+# B. Daily Demand Analysis
+hdfs dfs -rm -r -f /taxi_project/output/daily
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_daily.py,reducers\reducer_daily.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/daily ^
+  -mapper "python mapper_daily.py" ^
+  -reducer "python reducer_daily.py"
+
+# C. Location Analysis
+hdfs dfs -rm -r -f /taxi_project/output/location
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_location.py,reducers\reducer_location.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/location ^
+  -mapper "python mapper_location.py" ^
+  -reducer "python reducer_location.py"
+
+# D. Payment Channel Analysis
+hdfs dfs -rm -r -f /taxi_project/output/payment
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_payment.py,reducers\reducer_payment.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/payment ^
+  -mapper "python mapper_payment.py" ^
+  -reducer "python reducer_payment.py"
+
+# E. Distance Category Analysis
+hdfs dfs -rm -r -f /taxi_project/output/distance
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_distance.py,reducers\reducer_distance.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/distance ^
+  -mapper "python mapper_distance.py" ^
+  -reducer "python reducer_distance.py"
+
+# F. Route Analysis
+hdfs dfs -rm -r -f /taxi_project/output/route
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_route.py,reducers\reducer_route.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/route ^
+  -mapper "python mapper_route.py" ^
+  -reducer "python reducer_route.py"
+
+# G. Trip Duration Analysis
+hdfs dfs -rm -r -f /taxi_project/output/duration
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_duration.py,reducers\reducer_duration.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/duration ^
+  -mapper "python mapper_duration.py" ^
+  -reducer "python reducer_duration.py"
+
+# H. Data Anomaly Flagging
+hdfs dfs -rm -r -f /taxi_project/output/anomaly
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_anomaly.py,reducers\reducer_anomaly.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/anomaly ^
+  -mapper "python mapper_anomaly.py" ^
+  -reducer "python reducer_anomaly.py"
+
+
+5. MULTI-STAGE MAPREDUCE PIPELINE (TOP 10 REVENUE ZONES)
+--------------------------------------------------------------------------------
+# Stage 1: Revenue per Pickup Zone
+hdfs dfs -rm -r -f /taxi_project/output/revenue
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_revenue.py,reducers\reducer_revenue.py ^
+  -input /taxi_project/input/cleaned ^
+  -output /taxi_project/output/revenue ^
+  -mapper "python mapper_revenue.py" ^
+  -reducer "python reducer_revenue.py"
+
+# Stage 2: Global Top 10 Ranking (Consumes Stage 1 Output)
+hdfs dfs -rm -r -f /taxi_project/output/revenue_top10
+hadoop jar %HADOOP_HOME%\share\hadoop\tools\lib\hadoop-streaming-*.jar ^
+  -files mappers\mapper_top10.py,reducers\reducer_top10.py ^
+  -input /taxi_project/output/revenue ^
+  -output /taxi_project/output/revenue_top10 ^
+  -mapper "python mapper_top10.py" ^
+  -reducer "python reducer_top10.py"
+
+
+6. AUTOMATED FULL BATCH EXECUTION
+--------------------------------------------------------------------------------
+# Run all MapReduce streaming jobs via Windows Batch script
+run_all_jobs.bat
+
+
+7. FETCH HDFS RESULTS TO LOCAL FILE SYSTEM
+--------------------------------------------------------------------------------
+if not exist results mkdir results
+hdfs dfs -get -f /taxi_project/output/* results/
+
+
+8. PERFORMANCE BENCHMARK & VISUALIZATIONS
+--------------------------------------------------------------------------------
+# Execute Pandas vs Hadoop MapReduce benchmark
+python scripts\performance_comparison.py
+
+# Generate all chart visual artifacts
+python visualizations\generate_visualizations.py
+
+# Verify generated chart files
+dir charts
+
+
+9. CLEANUP & SUBMISSION PACKAGING
+--------------------------------------------------------------------------------
+# Remove Python cache directories
+rmdir /s /q __pycache__ 2>nul
+for /d /r %i in (__pycache__) do @rmdir /s /q "%i" 2>nul
+
+# Package full submission ZIP archive
+powershell -Command "Compress-Archive -Path * -DestinationPath ..\hdfs_project_submission.zip -Force"
+
+# Package lightweight ZIP archive (excluding raw CSV)
+powershell -Command "Get-ChildItem -Path . -Exclude 'cleaned_yellow_tripdata.csv', '*.parquet', '*.tar.gz' | Compress-Archive -DestinationPath ..\hdfs_project_submission.zip -Force"
